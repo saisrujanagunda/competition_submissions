@@ -1,0 +1,338 @@
+```{r}
+
+library(dplyr)
+library(readxl)
+library(tidyr)
+library(sf)
+library(ggplot2)
+library(lubridate)
+library(leaflet)
+library(ggmap)
+library(plotly)
+library(imager)
+
+
+```
+
+```{r}
+
+charity <- read_xlsx("C:/MS_2024/Viz_for_social_good/Charity.xlsx")
+all_submissions <- read_xlsx("C:/MS_2024/Viz_for_social_good/VFSG_All_Submissions.xlsx")
+
+```
+
+```{r}
+
+impact_data <- read_xlsx("C:/MS_2024/Viz_for_social_good/Charity.xlsx", sheet = 2)
+#read_xlsx("C:/MS_2024/Viz_for_social_good/Linkedin_Stats.xlsx")
+countries <- read_xlsx("C:/MS_2024/Viz_for_social_good/countries.xlsx")
+
+```
+
+```{r}
+
+charity_n_vfsg <- merge(all_submissions, charity, by = "Project ID", all.x = TRUE)
+colnames(charity_n_vfsg)
+
+```
+
+```{r}
+
+columns_to_remove <- c("ID", "Submission flag", "URL", "Name of charity/Project.y")
+charity_n_vfsg <- charity_n_vfsg[, -which(names(charity_n_vfsg) %in% columns_to_remove)]
+
+```
+
+I would first like to emphasize on the collaborative work of VFSG
+
+```{r}
+charity_unique_counts <- charity_n_vfsg %>%
+  group_by(`SDG Goals`) %>%
+  distinct(`Name of charity/Project.x`) %>%
+  arrange(`SDG Goals`) 
+
+print(charity_unique_counts)
+```
+
+
+
+```{r}
+
+# Create a pie chart using ggplot2
+pie_chart <- ggplot(charity_counts, aes(x = "", y = Unique_Count, fill = `SDG Goals`)) +
+  geom_bar(stat = "identity", width = 1, color = "white") +
+  coord_polar("y", start = 0) +
+  labs(title = "Unique Charity/Project Counts by SDG Goals") +
+  theme_void() +
+  theme(legend.position = "right") 
+
+# Print the pie chart
+print(pie_chart)
+
+```
+
+```{r}
+
+# no.of projects VFSG collaborated and the impact of volunteer contributions
+
+charity_n_vfsg$Year <- year(charity_n_vfsg$`Date of project`)
+
+# Group the data by Year and summarize the projects and unique volunteers
+projects_per_year <- charity_n_vfsg %>%
+  group_by(Year, `Name of charity/Project.x`) %>%
+  summarize(Num_Projects = n(),
+            Num_Unique_Volunteers = n_distinct(`Name of volunteer`)) %>%
+  group_by(Year) %>%
+  summarize(Total_Projects = n(),
+            Total_Volunteers = sum(Num_Unique_Volunteers)) %>%
+  arrange(Year)  # Optional: Sort the result by year
+
+# Print the result
+print(projects_per_year)
+
+```
+
+
+```{r}
+# Project Impact vs. Volunteer Engagement: Bubble chart
+
+# Plotting the bubble chart of project impact vs. volunteer engagement
+bubble_chart <- ggplot(projects_per_year, aes(x = Total_Projects, y = Total_Volunteers, size = Total_Projects, color = Total_Volunteers)) +
+  geom_point(alpha = 0.7) +
+  scale_size_continuous(range = c(3, 10)) +
+  labs(title = "Project Impact vs. Volunteer Engagement", x = "Number of Projects", y = "Number of Volunteers", size = "Number of Projects", color = "Number of Volunteers") +
+  theme_minimal()
+
+# Display the bubble chart
+print(bubble_chart)
+
+```
+
+
+
+```{r}
+
+# Group the data by Year and concatenate the names of charity partners into a single string
+charity_partners_per_year <- charity_n_vfsg %>%
+  group_by(Year) %>%
+  summarize(Charity_Partners = toString(unique(`Name of charity/Project.x`))) %>%
+  arrange(Year)  # Optional: Sort the result by year
+
+# Print the result
+print(charity_partners_per_year)
+
+```
+
+I found most of the charity partners were unique, except UNDP, Kiron, Sunny Street, Bridges to Prosperity, Viz For Social Good.
+
+```{r}
+
+# Assuming you have a dataframe named "vfsg_data" with columns "Date of project" and "Name of volunteer"
+
+# Convert "Date of project" column to Date format
+all_submissions$`Date of project` <- as.Date(all_submissions$`Date of project`)
+
+# Extract year from the date
+all_submissions$Year <- format(all_submissions$`Date of project`, "%Y")
+
+# Group data by year and count unique volunteers for each year
+volunteers_by_year <- all_submissions %>%
+  group_by(Year) %>%
+  summarize(Unique_Volunteers = n_distinct(`Name of volunteer`))
+
+# Calculate the number of newly participating volunteers for each year
+new_volunteers <- c(0, diff(volunteers_by_year$Unique_Volunteers))
+
+# Create a dataframe with year and newly participating volunteers
+new_volunteers_by_year <- data.frame(Year = volunteers_by_year$Year, New_Volunteers = new_volunteers)
+
+# Print the dataframe
+print(new_volunteers_by_year)
+
+```
+
+
+```{r}
+library(ggplot2)
+library(jpeg)
+library(grid)
+
+# Plot the line chart
+line_chart <- ggplot(new_volunteers_by_year, aes(x = Year, y = New_Volunteers)) +
+  geom_line(color = "blue", group = 1) +  # Adding 'group = 1' to ensure all points are connected with a line
+  geom_point(color = "blue") +
+  labs(title = "Number of Newly Participating Volunteers Over the Years",
+       x = "Year",
+       y = "Number of New Volunteers") +
+  theme_minimal()
+
+# Print the line chart
+print(line_chart)
+
+```
+
+
+```{r}
+
+# Get the projects for each year
+projects_2020 <- unique(charity_n_vfsg$`Name of charity/Project.x`[year(charity_n_vfsg$"Date of project") == 2020])
+projects_2021 <- unique(charity_n_vfsg$`Name of charity/Project.x`[year(charity_n_vfsg$"Date of project") == 2021])
+projects_2022 <- unique(charity_n_vfsg$`Name of charity/Project.x`[year(charity_n_vfsg$"Date of project") == 2022])
+
+projects_2017_2019 <- unique(charity_n_vfsg$`Name of charity/Project.x`[year(charity_n_vfsg$"Date of project") %in% c(2017, 2018, 2019)])
+projects_2023 <- unique(charity_n_vfsg$`Name of charity/Project.x`[year(charity_n_vfsg$"Date of project") == 2023])
+
+# Find the projects that are unique to 2020, 2021, and 2022
+unique_projects <- setdiff(union(union(projects_2020, projects_2021), projects_2022), union(projects_2017_2019, projects_2023))
+
+# Print the unique projects
+print(unique_projects)
+
+```
+
+```{r}
+# Filter the dataset to include only the projects unique to the years 2020, 2021, and 2022
+unique_projects_data <- charity_n_vfsg[charity_n_vfsg$`Name of charity/Project.x` %in% unique_projects, ]
+
+# Extract SDG goals for unique projects
+unique_goals_unique_projects <- unique(unique_projects_data$`SDG Goals`)
+
+# Filter the dataset to include the rest of the projects
+other_projects_data <- charity_n_vfsg[!charity_n_vfsg$`Name of charity/Project.x` %in% unique_projects, ]
+
+# Extract SDG goals for other projects
+unique_goals_other_projects <- unique(other_projects_data$`SDG Goals`)
+
+# Print the unique SDG goals
+cat("SDG goals associated with projects unique to 2020, 2021, and 2022:", unique_goals_unique_projects, "\n")
+cat("SDG goals associated with other projects:", unique_goals_other_projects, "\n")
+
+```
+
+```{r}
+
+# Calculate the number of unique volunteers for unique projects based on SDG goals
+unique_volunteers_unique_goals <- n_distinct(unique_projects_data$`Name of volunteer`)
+
+# Filter the dataset to include the rest of the projects
+other_projects_data <- charity_n_vfsg[!charity_n_vfsg$`Name of charity/Project.x` %in% unique_projects, ]
+
+# Calculate the number of unique volunteers for the rest of the projects based on SDG goals
+unique_volunteers_other_goals <- n_distinct(other_projects_data$`Name of volunteer`)
+
+# Compare the number of unique volunteers
+cat("Number of unique volunteers for projects unique to 2020, 2021, and 2022 based on SDG goals:", unique_volunteers_unique_goals, "\n")
+cat("Number of unique volunteers for other projects based on SDG goals:", unique_volunteers_other_goals, "\n")
+
+```
+
+
+```{r}
+
+# using linkedin stats to understand the engagement rate
+
+linkedin_location <- read_xlsx("C:/MS_2024/Viz_for_social_good/Linkedin_Stats.xlsx", sheet = "Location")
+linkedin_metrics <- read_xlsx("C:/MS_2024/Viz_for_social_good/Linkedin_Stats.xlsx", sheet = "LI Metrics")
+
+```
+
+```{r}
+columns_to_remove <- c("Impressions (organic)", "Impressions (sponsored)", "Clicks (organic)", "Clicks (sponsored)", "Reactions (organic)", "Reactions (sponsored)", "Comments (organic)", "Comments (sponsored)", "Reposts (organic)", "Reposts (sponsored)", "Engagement rate (organic)", "Engagement rate (sponsored)")
+linkedin_metrics <- linkedin_metrics[, -which(names(linkedin_metrics) %in% columns_to_remove)]
+```
+
+```{r}
+colnames(linkedin_metrics)
+```
+
+
+```{r}
+
+# Convert Date column to Date format
+linkedin_metrics$Date <- as.Date(linkedin_metrics$Date, format = "%m/%d/%Y")
+
+# Extract year from Date column
+linkedin_metrics$Year <- format(linkedin_metrics$Date, "%Y")
+
+# Group the data by Date and calculate the average Impressions_total for each date
+average_impressions <- linkedin_metrics %>%
+  group_by(Year) %>%
+  summarize(Average_Impressions = mean(`Impressions (total)`))
+
+# Extract country name from Location column
+linkedin_location$Country <- gsub(".*,\\s*", "", linkedin_location$Location)
+
+# Merge countries and linkedin_location datasets based on the extracted country name
+merged_data <- merge(linkedin_location, countries, by.x = "Country", by.y = "name", all.x = TRUE)
+
+# Create a base map
+base_map <- ggplot() +
+  geom_sf(data = world_map, fill = "lightgray") +
+  coord_sf()
+
+# Add circles for LinkedIn locations with scaled radius
+linkedin_map <- base_map +
+  geom_point(data = merged_data, aes(x = longitude, y = latitude, size = sqrt(`Total followers`)), color = "orange", alpha = 0.5) +
+  scale_size_continuous(range = c(1, 10)) +  # Adjust size range as needed
+  labs(title = "LinkedIn Locations and Total Followers") +
+  theme_minimal()
+
+# Print the map
+print(linkedin_map)
+
+```
+
+
+```{r}
+
+# analyzing the twitter data
+twitter <- read_xlsx("C:/MS_2024/Viz_for_social_good/twitter.xlsx")
+colnames(twitter)
+
+```
+
+
+```{r}
+
+# Convert the 'Date' column to Date format
+twitter$Date <- as.Date(twitter$Date)
+twitter <- twitter[,-c(5)]
+
+twitter <- replace(twitter, is.na(twitter), 0)
+
+# Extract year from the 'Date' column
+twitter$Year <- lubridate::year(twitter$Date)
+
+# Group the data by 'Year' and 'Project'
+twitter_summary <- twitter %>%
+  group_by(Year, Project) %>%
+  summarise(Avg_Reposts_wo_quotes = mean(`Reposts w/o quotes`, na.rm = TRUE),
+            Avg_Reposts_with_quotes = mean(`Reposts with quotes`, na.rm = TRUE),
+            Avg_Likes = mean(Likes, na.rm = TRUE),
+            Avg_Saves = mean(`Saves (Bookmarks)`, na.rm = TRUE),
+            Avg_Replies = mean(Replies, na.rm = TRUE))
+
+# Print the summary
+print(twitter_summary)
+
+```
+
+
+```{r}
+
+# Reshape the summary data from wide to long format for plotting
+twitter_summary_long <- tidyr::pivot_longer(twitter_summary, cols = starts_with("Avg_"), names_to = "Metric", values_to = "Average")
+
+# Plot the grouped bar chart using ggplot2
+ggplot(data = twitter_summary_long, aes(x = Year, y = Average, fill = Metric)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Average Metrics Over Time", x = "Year", y = "Average Metrics") +
+  theme_minimal()
+
+print(twitter_plot)
+
+```
+
+
+
+

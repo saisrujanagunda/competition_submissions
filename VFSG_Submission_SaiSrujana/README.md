@@ -10,7 +10,7 @@ I tried to analyze the engagement rate of VFSG in three ways - volunteer engagem
 - I have observed that the projects have a good impact on the engagement rate.
 - To understand how many projects VFSG has actually conducted and the Goals it concentrates on, I adopted a pie chart. It is helpful to understand how many Charities/Projects are released with respect to the goal.
 
-[](https://github.com/saisrujanagunda/competition_submissions/blob/main/VFSG_Submission_SaiSrujana/figures/charities_involved_per_goal.png)
+![](https://github.com/saisrujanagunda/competition_submissions/blob/main/VFSG_Submission_SaiSrujana/figures/charities_involved_per_goal.png)
 
 - That said, the volunteers who participated in these competetions were also in my analysis (and I understood that there is a slight drop in the last two years)
 
